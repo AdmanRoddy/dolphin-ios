@@ -143,6 +143,49 @@ void Message(std::string text, u32 color = OSD::Color::CYAN)
 // ---- Guest memory --------------------------------------------------------------------------------
 // Quiet reads/writes: a bad pointer (cars being destroyed mid-frame, loading screens) must never
 // pop up an error, it just makes this frame's work skip.
+//
+// Newer Dolphin (2609+) spells these HostTryRead<T>/HostTryWrite<T>; older trees such as
+// DolphiniOS have HostTryReadU32 etc. MMU is a template parameter so only the branch that exists
+// gets compiled.
+template <typename MMU = PowerPC::MMU>
+std::optional<u32> TryReadU32(const Core::CPUThreadGuard& g, u32 a)
+{
+  if constexpr (requires { MMU::HostTryReadU32(g, a); })
+  {
+    const auto r = MMU::HostTryReadU32(g, a);
+    return r ? std::optional<u32>(r->value) : std::nullopt;
+  }
+  else
+  {
+    const auto r = MMU::template HostTryRead<u32>(g, a);
+    return r ? std::optional<u32>(r->value) : std::nullopt;
+  }
+}
+
+template <typename MMU = PowerPC::MMU>
+std::optional<u8> TryReadU8(const Core::CPUThreadGuard& g, u32 a)
+{
+  if constexpr (requires { MMU::HostTryReadU8(g, a); })
+  {
+    const auto r = MMU::HostTryReadU8(g, a);
+    return r ? std::optional<u8>(r->value) : std::nullopt;
+  }
+  else
+  {
+    const auto r = MMU::template HostTryRead<u8>(g, a);
+    return r ? std::optional<u8>(r->value) : std::nullopt;
+  }
+}
+
+template <typename MMU = PowerPC::MMU>
+void TryWriteU32(const Core::CPUThreadGuard& g, u32 a, u32 v)
+{
+  if constexpr (requires { MMU::HostTryWriteU32(g, v, a); })
+    MMU::HostTryWriteU32(g, v, a);
+  else
+    MMU::template HostTryWrite<u32>(g, v, a);
+}
+
 class Mem
 {
 public:
@@ -150,26 +193,26 @@ public:
 
   u32 U(u32 address)
   {
-    const auto r = PowerPC::MMU::HostTryRead<u32>(m_guard, address);
+    const auto r = TryReadU32(m_guard, address);
     if (!r)
     {
       m_ok = false;
       return 0;
     }
-    return r->value;
+    return *r;
   }
   float F(u32 address) { return std::bit_cast<float>(U(address)); }
-  void W(u32 address, u32 value) { PowerPC::MMU::HostTryWrite<u32>(m_guard, value, address); }
+  void W(u32 address, u32 value) { TryWriteU32(m_guard, address, value); }
   void WF(u32 address, float value) { W(address, std::bit_cast<u32>(value)); }
   std::string Str(u32 address, std::size_t max = 32)
   {
     std::string s;
     for (std::size_t i = 0; i < max; ++i)
     {
-      const auto r = PowerPC::MMU::HostTryRead<u8>(m_guard, address + static_cast<u32>(i));
-      if (!r || r->value == 0)
+      const auto r = TryReadU8(m_guard, address + static_cast<u32>(i));
+      if (!r || *r == 0)
         break;
-      s.push_back(static_cast<char>(r->value));
+      s.push_back(static_cast<char>(*r));
     }
     return s;
   }
