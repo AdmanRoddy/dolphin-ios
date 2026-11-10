@@ -62,6 +62,9 @@ constexpr u32 MAGIC_GAMEID = 0xD01F1BAD;
 
 size_t CountEnabledCodes();
 void SetActiveCodes(std::span<const GeckoCode> gcodes, const std::string& game_id, u16 revision);
+// Adds codes that a built-in feature needs (e.g. NFSMW multiplayer) to the active set, whether or
+// not the user has cheats enabled. Call after SetActiveCodes.
+void AddBuiltinCodes(std::span<const GeckoCode> gcodes);
 void SetSyncedCodesAsActive();
 void UpdateSyncedCodes(std::span<const GeckoCode> gcodes);
 std::vector<GeckoCode> SetAndReturnActiveCodes(std::span<const GeckoCode> gcodes);

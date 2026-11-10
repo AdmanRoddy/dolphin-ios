@@ -1,0 +1,71 @@
+name: NFSMW Multiplayer iOS build
+
+# Builds the non-jailbroken DolphiniOS app with the NFS Most Wanted multiplayer module
+# (Source/Core/Core/NFSMW) on GitHub's hosted Macs and uploads an .ipa to install with SideStore.
+# The .ipa is only ad-hoc signed; SideStore re-signs it with your own Apple ID.
+
+on:
+  push:
+    branches: [ nfsmw-multiplayer ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 180
+
+    env:
+      XCODE_COMMON_BUILD_ARGS: >-
+        -project Source/iOS/App/DolphiniOS.xcodeproj
+        -derivedDataPath "${{ github.workspace }}/build-Xcode"
+        -sdk iphoneos -destination generic/platform=iOS
+        DOL_PBID_ORGANIZATION_IDENTIFIER="io.github.${{ github.repository_owner }}.nfsmw"
+        DOL_BUILD_SOURCE="development"
+        CODE_SIGNING_ALLOWED="NO" CODE_SIGNING_REQUIRED="NO"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build utilities
+        run: brew install cmake ninja bartycrouch
+
+      - name: Build app
+        run: |
+          xcodebuild -version
+          # The full log is huge; keep it as an artifact and print only errors if it fails.
+          if ! xcodebuild archive \
+            -archivePath "${{ github.workspace }}/archives/NonJailbroken.xcarchive" \
+            -configuration "Release (Non-Jailbroken)" -scheme "DiOS (NJB)" \
+            ${{ env.XCODE_COMMON_BUILD_ARGS }} > xcodebuild.log 2>&1; then
+            grep -E "error:|FAILED" xcodebuild.log | head -80
+            exit 1
+          fi
+          grep -E "NFSMW|ARCHIVE SUCCEEDED" xcodebuild.log | tail -5
+
+      - name: Package IPA
+        run: |
+          APP="${{ github.workspace }}/archives/NonJailbroken.xcarchive/Products/Applications/DolphiniOS.app"
+          ENT="${{ github.workspace }}/Source/iOS/App/Project/Entitlements/Public.entitlements"
+          WORK=$(mktemp -d)
+          mkdir "$WORK/Payload"
+          cp -R "$APP" "$WORK/Payload/"
+          # Ad-hoc sign (frameworks first, then the app with its entitlements) so the bundle is valid;
+          # SideStore replaces this signature with yours when it installs the app.
+          codesign -f -s - "$WORK/Payload/DolphiniOS.app/Frameworks/"* || true
+          codesign -f -s - --entitlements "$ENT" "$WORK/Payload/DolphiniOS.app"
+          mkdir -p "${{ github.workspace }}/products"
+          (cd "$WORK" && zip -qr "${{ github.workspace }}/products/DolphiniOS-NFSMW-Multiplayer.ipa" Payload)
+          ls -la "${{ github.workspace }}/products"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DolphiniOS-NFSMW-Multiplayer
+          path: products/DolphiniOS-NFSMW-Multiplayer.ipa
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-log
+          path: xcodebuild.log

@@ -79,6 +79,15 @@ void SetActiveCodes(std::span<const GeckoCode> gcodes, const std::string& game_i
   s_code_handler_installed = Installation::Uninstalled;
 }
 
+void AddBuiltinCodes(std::span<const GeckoCode> gcodes)
+{
+  if (gcodes.empty())
+    return;
+  std::lock_guard lk(s_active_codes_lock);
+  s_active_codes.insert(s_active_codes.end(), gcodes.begin(), gcodes.end());
+  s_code_handler_installed = Installation::Uninstalled;
+}
+
 void SetSyncedCodesAsActive()
 {
   s_active_codes.clear();

@@ -32,6 +32,7 @@
 #include "Core/Debugger/PPCDebugInterface.h"
 #include "Core/GeckoCode.h"
 #include "Core/GeckoCodeConfig.h"
+#include "Core/NFSMW/Multiplayer.h"
 #include "Core/PowerPC/MMU.h"
 #include "Core/PowerPC/PowerPC.h"
 #include "Core/System.h"
@@ -201,6 +202,7 @@ void LoadPatches()
     ActionReplay::LoadAndApplyCodes(globalIni, localIni, sconfig.GetGameID(),
                                     sconfig.GetRevision());
   }
+  Gecko::AddBuiltinCodes(NFSMW::GetBuiltinCodes(sconfig.GetGameID()));
 
   const size_t enabled_patch_count =
       std::ranges::count_if(s_on_frame, [](Patch patch) { return patch.enabled; });
@@ -349,6 +351,7 @@ bool ApplyFramePatches(Core::System& system)
   // Run the Gecko code handler
   Gecko::RunCodeHandler(guard);
   ActionReplay::RunAllActive(guard);
+  NFSMW::OnFrame(guard);
 
   return true;
 }
@@ -358,6 +361,7 @@ void Shutdown()
   s_on_frame.clear();
   ActionReplay::ApplyCodes({}, "", 0);
   Gecko::Shutdown();
+  NFSMW::Shutdown();
 }
 
 void Reload(Core::System& system)

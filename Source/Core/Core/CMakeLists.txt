@@ -483,6 +483,8 @@ add_library(core
   NetPlayServer.h
   NetworkCaptureLogger.cpp
   NetworkCaptureLogger.h
+  NFSMW/Multiplayer.cpp
+  NFSMW/Multiplayer.h
   PatchEngine.cpp
   PatchEngine.h
   PowerPC/BreakPoints.cpp
