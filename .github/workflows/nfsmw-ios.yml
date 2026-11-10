@@ -23,6 +23,10 @@ jobs:
         DOL_PBID_ORGANIZATION_IDENTIFIER="io.github.${{ github.repository_owner }}.nfsmw"
         DOL_BUILD_SOURCE="development"
         CODE_SIGNING_ALLOWED="NO" CODE_SIGNING_REQUIRED="NO"
+        GCC_PREPROCESSOR_DEFINITIONS='$(inherited) FMT_CONSTEVAL='
+      # fmt 10.2.1's compile-time format strings don't build with Xcode 26's clang;
+      # FMT_CONSTEVAL= (empty) is fmt's switch to check them at run time instead.
+      DOL_EXTRA_CXX_FLAGS: -DFMT_CONSTEVAL=
 
     steps:
       - uses: actions/checkout@v4
